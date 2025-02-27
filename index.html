@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <div id="messages" style="margin-bottom: 70px;"></div>
+    <div style="position: fixed; bottom: 0; background: white; width: 100%; padding: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);">
+        <input type="text" id="nombre" placeholder="Tu nombre (EJ: Pepe)" style="width: 30%; margin-right: 5px;">
+        <input type="text" id="mensaje" placeholder="Mensaje" style="width: 50%;">
+        <button onclick="enviar()" style="width: 13%;">➤</button>
+    </div>
+
+<script>
+// ███████████████████ TUS DATOS REALES ███████████████████
+const FORM_ID = '1FAIpQLSeixXrDeM8jMnMgSX2uJpdvFnaubIytGN5S4HKENlkWrQSBlw'; // ID de TU FORM
+const ENTRY_NOMBRE = 'entry.2005620554'; // Campo NOMBRE
+const ENTRY_MSG = 'entry.1166974658';    // Campo MENSAJE
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRoZePEd-VwaU-_gg4Pi0q6P6r6sC8q2gpuH5L3baehx8B5S2h-MlppzxDdsHU9Yv1Hg7pbeXVOhP5F/pub?output=csv'; // TU CSV
+
+// █████████████████ FUNCIONES █████████████████
+function enviar() {
+    const nombre = document.getElementById('nombre').value.trim();
+    const msg = document.getElementById('mensaje').value.trim();
+    
+    if (!nombre || !msg) {
+        alert("¡Escribe nombre y mensaje!");
+        return;
+    }
+
+    // URL MÁGICA PARA ENVIAR (CON TUS DATOS)
+    const url = `https://docs.google.com/forms/d/e/${FORM_ID}/formResponse?usp=pp_url&${ENTRY_NOMBRE}=${encodeURIComponent(nombre)}&${ENTRY_MSG}=${encodeURIComponent(msg)}&submit=Submit`;
+    
+    // TRUCO ANDROID PARA ENVIAR
+    const img = new Image();
+    img.src = url;
+    
+    document.getElementById('mensaje').value = '';
+    setTimeout(cargarMensajes, 3000); // Esperar 3 segundos
+}
+
+async function cargarMensajes() {
+    try {
+        const response = await fetch(CSV_URL + "&rand=" + Math.random());
+        const csv = await response.text();
+        const lineas = csv.split('\n').slice(1); // Quitar encabezados
+        
+        let html = '';
+        lineas.forEach(linea => {
+            const [fecha, nombre, mensaje] = linea.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex para CSV complejo
+            if (nombre && mensaje) {
+                html += `<div style="margin: 10px; padding: 8px; background: #f0f0f0; border-radius: 5px;">
+                            <b>${nombre}</b><br>${mensaje.replace(/"/g, '')}
+                         </div>`;
+            }
+        });
+        
+        document.getElementById('messages').innerHTML = html;
+        window.scrollTo(0, document.body.scrollHeight); // Mover al final
+    } catch (error) {
+        console.log("Error cargando mensajes:", error);
+    }
+}
+
+// █████████████████ EJECUCIÓN █████████████████
+setInterval(cargarMensajes, 5000); // Actualizar cada 5 seg
+cargarMensajes(); // Cargar al inicio
+</script>
+</body>
+</html>
