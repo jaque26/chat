@@ -49,7 +49,7 @@
                 });
                 document.getElementById('mensaje').value = '';
                 alert("Mensaje enviado ✔️");
-                cargarMensajes();
+                cargarMensajes(); // Carga inmediatamente después de enviar
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -58,12 +58,27 @@
 
         async function cargarMensajes() {
             try {
-                const response = await fetch(CSV_URL);
+                // Agrega un timestamp para evitar caché
+                const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
                 const text = await response.text();
                 const rows = text.split('\n').slice(1); // Omite encabezado
                 let html = '';
                 for (let row of rows) {
-                    const columns = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                    // Parseo robusto para CSV
+                    const columns = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let char of row) {
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            columns.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    columns.push(current.trim()); // Última columna
                     if (columns.length >= 3) {
                         const nombre = columns[1].replace(/^"|"$/g, '');
                         const mensaje = columns[2].replace(/^"|"$/g, '');
@@ -79,7 +94,7 @@
         }
 
         cargarMensajes();
-        setInterval(cargarMensajes, 5000);
+        setInterval(cargarMensajes, 2000); // Actualiza cada 2 segundos
     </script>
 </body>
 </html>
