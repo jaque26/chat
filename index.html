@@ -7,17 +7,24 @@
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #000000; height: 100vh; display: flex; flex-direction: column; color: #ffffff; }
         #messages { flex: 1; padding: 15px; overflow-y: auto; }
-        .mensaje { background: #1a1a1a; padding: 10px; margin: 10px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(255,255,255,0.1); color: #ffffff; }
+        .mensaje { padding: 10px; margin: 10px 0; border-radius: 8px; max-width: 70%; word-wrap: break-word; }
+        .mensaje.mio { background: #075e54; float: right; clear: both; }
+        .mensaje.otro { background: #262d31; float: left; clear: both; }
         .input-container { position: sticky; bottom: 0; background: #1a1a1a; width: 100%; padding: 10px; box-shadow: 0 -2px 10px rgba(255,255,255,0.1); display: flex; gap: 5px; }
+        #nombre-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
         input { flex: 1; padding: 10px; border: 1px solid #333333; border-radius: 5px; background: #333333; color: #ffffff; }
         button { padding: 10px 20px; background: #4a4a4a; color: #ffffff; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background: #666666; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
+    <div id="nombre-container">
+        <input type="text" id="nombre-inicial" placeholder="Escribe tu nombre">
+        <button onclick="guardarNombre()">Continuar</button>
+    </div>
     <div id="messages"></div>
-    <div class="input-container">
-        <input type="text" id="nombre" placeholder="Tu nombre (Ej: Ana)">
+    <div class="input-container hidden" id="chat-input">
         <input type="text" id="mensaje" placeholder="Escribe algo...">
         <button onclick="enviar()">Enviar</button>
     </div>
@@ -27,18 +34,41 @@
         const ENTRY_NOMBRE = 'entry.274401486';
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
+        let ultimoContenido = ''; // Para evitar parpadeo
+        let miNombre = localStorage.getItem('miNombre') || '';
+
+        // Mostrar u ocultar elementos según si ya hay nombre
+        if (miNombre) {
+            document.getElementById('nombre-container').classList.add('hidden');
+            document.getElementById('chat-input').classList.remove('hidden');
+            cargarMensajes();
+            setInterval(cargarMensajes, 2000);
+        }
+
+        function guardarNombre() {
+            const nombre = document.getElementById('nombre-inicial').value.trim();
+            if (!nombre) {
+                alert("¡Escribe tu nombre!");
+                return;
+            }
+            miNombre = nombre;
+            localStorage.setItem('miNombre', miNombre);
+            document.getElementById('nombre-container').classList.add('hidden');
+            document.getElementById('chat-input').classList.remove('hidden');
+            cargarMensajes();
+            setInterval(cargarMensajes, 2000);
+        }
 
         async function enviar() {
-            const nombre = document.getElementById('nombre').value.trim();
             const msg = document.getElementById('mensaje').value.trim();
 
-            if (!nombre || !msg) {
-                alert("¡Nombre y mensaje son obligatorios!");
+            if (!msg) {
+                alert("¡Escribe un mensaje!");
                 return;
             }
 
             const formData = new FormData();
-            formData.append(ENTRY_NOMBRE, nombre);
+            formData.append(ENTRY_NOMBRE, miNombre);
             formData.append(ENTRY_MSG, msg);
 
             try {
@@ -49,7 +79,7 @@
                 });
                 document.getElementById('mensaje').value = '';
                 alert("Mensaje enviado ✔️");
-                cargarMensajes(); // Carga inmediatamente después de enviar
+                cargarMensajes();
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -58,13 +88,11 @@
 
         async function cargarMensajes() {
             try {
-                // Agrega un timestamp para evitar caché
                 const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
                 const text = await response.text();
-                const rows = text.split('\n').slice(1); // Omite encabezado
+                const rows = text.split('\n').slice(1);
                 let html = '';
                 for (let row of rows) {
-                    // Parseo robusto para CSV
                     const columns = [];
                     let current = '';
                     let inQuotes = false;
@@ -78,23 +106,25 @@
                             current += char;
                         }
                     }
-                    columns.push(current.trim()); // Última columna
+                    columns.push(current.trim());
                     if (columns.length >= 3) {
                         const nombre = columns[1].replace(/^"|"$/g, '');
                         const mensaje = columns[2].replace(/^"|"$/g, '');
-                        html += `<div class="mensaje"><b>${nombre}</b>: ${mensaje}</div>`;
+                        const clase = (nombre === miNombre) ? 'mio' : 'otro';
+                        html += `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}</div>`;
                     }
                 }
-                document.getElementById('messages').innerHTML = html;
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                // Solo actualiza si hay cambios
+                if (html !== ultimoContenido) {
+                    document.getElementById('messages').innerHTML = html;
+                    ultimoContenido = html;
+                    const messagesDiv = document.getElementById('messages');
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
             }
         }
-
-        cargarMensajes();
-        setInterval(cargarMensajes, 2000); // Actualiza cada 2 segundos
     </script>
 </body>
 </html>
