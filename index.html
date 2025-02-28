@@ -17,6 +17,7 @@
         button { padding: 10px 20px; background: #4a4a4a; color: #ffffff; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background: #666666; }
         .hidden { display: none; }
+        #notificacion { position: fixed; bottom: 60px; right: 20px; background: #075e54; padding: 10px; border-radius: 5px; color: #ffffff; font-size: 0.9em; display: none; }
     </style>
 </head>
 <body>
@@ -29,6 +30,7 @@
         <input type="text" id="mensaje" placeholder="Escribe algo...">
         <button onclick="enviar()">Enviar</button>
     </div>
+    <div id="notificacion">✔ Enviado</div>
 
     <script>
         const FORM_ID = '1FAIpQLSeixXrDeM8jMnMgSX2uJpdvFnaubIytGN5S4HKENlkWrQSBlw';
@@ -36,13 +38,13 @@
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map(); // Para almacenar mensajes y evitar parpadeo
+        let mensajesActuales = new Map();
 
         if (miNombre) {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 5000); // Cada 5 segundos para estabilidad
+            setInterval(cargarMensajes, 5000);
         }
 
         function guardarNombre() {
@@ -78,8 +80,10 @@
                     mode: 'no-cors'
                 });
                 document.getElementById('mensaje').value = '';
-                alert("Mensaje enviado ✔️");
-                cargarMensajes();
+                const notif = document.getElementById('notificacion');
+                notif.style.display = 'block';
+                setTimeout(() => notif.style.display = 'none', 1000); // Desaparece en 1 segundo
+                cargarMensajes(); // Carga tras enviar, como antes
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -110,16 +114,17 @@
                     }
                     columns.push(current.trim());
                     if (columns.length >= 3) {
-                        const timestamp = columns[0].replace(/^"|"$/g, '');
+                        const timestampRaw = columns[0].replace(/^"|"$/g, '');
                         const nombre = columns[1].replace(/^"|"$/g, '');
                         const mensaje = columns[2].replace(/^"|"$/g, '');
-                        const mensajeId = `${timestamp}:${nombre}:${mensaje}`; // ID único
+                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
 
                         if (!mensajesActuales.has(mensajeId)) {
-                            mensajesActuales.set(mensajeId, { timestamp, nombre, mensaje });
+                            mensajesActuales.set(mensajeId, { timestamp: timestampRaw, nombre, mensaje });
                             nuevosMensajes = true;
+                            const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
+                            const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
                             const clase = (nombre === miNombre) ? 'mio' : 'otro';
-                            const hora = new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
                             const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
                             messagesDiv.insertAdjacentHTML('beforeend', html);
                         }
