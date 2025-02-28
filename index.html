@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Chat Funcional 100%</title>
+    <title>FCORP</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #000000; height: 100vh; display: flex; flex-direction: column; color: #ffffff; }
@@ -82,8 +82,8 @@
                 document.getElementById('mensaje').value = '';
                 const notif = document.getElementById('notificacion');
                 notif.style.display = 'block';
-                setTimeout(() => notif.style.display = 'none', 1000); // Desaparece en 1 segundo
-                cargarMensajes(); // Carga tras enviar, como antes
+                setTimeout(() => notif.style.display = 'none', 1000); // 1 segundo
+                cargarMensajes();
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -116,7 +116,9 @@
                     if (columns.length >= 3) {
                         const timestampRaw = columns[0].replace(/^"|"$/g, '');
                         const nombre = columns[1].replace(/^"|"$/g, '');
-                        const mensaje = columns[2].replace(/^"|"$/g, '');
+                        // Escapar HTML para evitar ejecución
+                        let mensaje = columns[2].replace(/^"|"$/g, '');
+                        mensaje = mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                         const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
 
                         if (!mensajesActuales.has(mensajeId)) {
