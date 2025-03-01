@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Chat Funcional 100%</title>
+    <title>Chat Funcional con Firebase</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #000000; height: 100vh; display: flex; flex-direction: column; color: #ffffff; }
@@ -31,28 +31,41 @@
     <div class="input-container hidden" id="chat-input">
         <input type="text" id="mensaje" placeholder="Escribe algo...">
         <button onclick="enviar()">Enviar</button>
-        <button onclick="cargarMensajes()">Recargar</button>
-        <button onclick="limpiarChat()">Limpiar</button>
     </div>
     <div id="notificacion">✔ Enviado</div>
     <div id="debug"></div>
 
-    <script>
-        const FORM_ID = '1FAIpQLSeixXrDeM8jMnMgSX2uJpdvFnaubIytGN5S4HKENlkWrQSBlw';
-        const ENTRY_NOMBRE = 'entry.274401486';
-        const ENTRY_MSG = 'entry.283835787';
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
+    <script type="module">
+        // Importar Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        // Tu configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDT7bX6qTx2U1EcDuugMZ0xdXzHNOifOzE",
+            authDomain: "fcorp-f0633.firebaseapp.com",
+            databaseURL: "https://fcorp-f0633-default-rtdb.firebaseio.com",
+            projectId: "fcorp-f0633",
+            storageBucket: "fcorp-f0633.firebasestorage.app",
+            messagingSenderId: "536164036989",
+            appId: "1:536164036989:web:f4c0776c1b7e44b5005c14",
+            measurementId: "G-W15GX5VNZ1"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const mensajesRef = ref(db, 'mensajes');
+
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map();
 
         if (miNombre) {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 5000); // 5 segundos
         }
 
-        function guardarNombre() {
+        window.guardarNombre = function() {
             const nombre = document.getElementById('nombre-inicial').value.trim();
             if (!nombre) {
                 alert("¡Escribe tu nombre!");
@@ -63,136 +76,56 @@
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 5000); // 5 segundos
-        }
+        };
 
-        async function enviar() {
+        window.enviar = function() {
             const msg = document.getElementById('mensaje').value.trim();
             if (!msg) {
                 alert("¡Escribe un mensaje!");
                 return;
             }
 
-            const formData = new FormData();
-            formData.append(ENTRY_NOMBRE, miNombre);
-            formData.append(ENTRY_MSG, msg);
+            const timestamp = new Date().toISOString();
+            const mensaje = {
+                nombre: miNombre,
+                mensaje: msg,
+                timestamp: timestamp,
+                hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+            };
 
-            try {
-                await fetch(`https://docs.google.com/forms/d/e/${FORM_ID}/formResponse`, {
-                    method: 'POST',
-                    body: formData,
-                    mode: 'no-cors'
+            push(mensajesRef, mensaje)
+                .then(() => {
+                    document.getElementById('mensaje').value = '';
+                    const notif = document.getElementById('notificacion');
+                    notif.style.display = 'block';
+                    setTimeout(() => notif.style.display = 'none', 1000);
+                })
+                .catch(error => {
+                    mostrarError("Error al enviar: " + error.message);
                 });
+        };
 
-                const timestamp = new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const hora = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                const mensajeId = `${timestamp}:${miNombre}:${msg}`;
+        function cargarMensajes() {
+            onValue(mensajesRef, (snapshot) => {
                 const messagesDiv = document.getElementById('messages');
-                const html = `<div class="mensaje mio" data-id="${mensajeId}"><b>${miNombre}</b>: ${msg}<div class="hora">${hora}</div></div>`;
-                messagesDiv.insertAdjacentHTML('beforeend', html);
-                mensajesActuales.set(mensajeId, { timestamp, nombre: miNombre, mensaje: msg, hora });
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                messagesDiv.innerHTML = '';
 
-                document.getElementById('mensaje').value = '';
-                const notif = document.getElementById('notificacion');
-                notif.style.display = 'block';
-                setTimeout(() => notif.style.display = 'none', 1000);
-                setTimeout(cargarMensajes, 1000);
-            } catch (error) {
-                mostrarError("Error al enviar: " + error.message);
-            }
-        }
-
-        async function cargarMensajes() {
-            const messagesDiv = document.getElementById('messages');
-            try {
-                const response = await fetch(`${CSV_URL}&t=${Date.now()}`, {
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' }
-                });
-                const text = await response.text();
-                mostrarDebug("CSV recibido: " + text.substring(0, 100) + (text.length > 100 ? "..." : ""));
-                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
-                const nuevosMensajes = new Map();
-
-                // Si el CSV está vacío o solo tiene encabezados, no limpiar mensajes locales inmediatamente
-                if (rows.length === 0 || (rows.length === 1 && rows[0].startsWith('Marca temporal'))) {
-                    if (mensajesActuales.size === 0 && !messagesDiv.querySelector('.mensaje')) {
-                        messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
-                    }
+                const data = snapshot.val();
+                if (!data) {
+                    messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                     return;
                 }
 
-                rows.forEach(row => {
-                    const columns = [];
-                    let current = '';
-                    let inQuotes = false;
-
-                    for (let char of row) {
-                        if (char === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (char === ',' && !inQuotes) {
-                            columns.push(current.trim());
-                            current = '';
-                        } else {
-                            current += char;
-                        }
-                    }
-                    columns.push(current.trim());
-
-                    if (columns.length >= 3 && columns[0] && columns[1] && columns[2]) {
-                        const timestampRaw = columns[0].replace(/^"|"$/g, '');
-                        const nombre = columns[1].replace(/^"|"$/g, '');
-                        let mensaje = columns[2].replace(/^"|"$/g, '');
-                        mensaje = mensaje.replace(/</g, '<').replace(/>/g, '>');
-
-                        const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
-                        if (!parts) return;
-
-                        const hora = new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
-                        nuevosMensajes.set(mensajeId, { timestamp: timestampRaw, nombre, mensaje, hora });
-                    }
+                Object.entries(data).forEach(([id, mensaje]) => {
+                    const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
+                    const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${mensaje.nombre}</b>: ${mensaje.mensaje}<div class="hora">${mensaje.hora}</div></div>`;
+                    messagesDiv.insertAdjacentHTML('beforeend', html);
                 });
 
-                const mensajesDom = messagesDiv.querySelectorAll('.mensaje');
-                mensajesDom.forEach(msg => {
-                    const id = msg.dataset.id;
-                    if (!nuevosMensajes.has(id) && !mensajesActuales.has(id)) {
-                        msg.remove();
-                    }
-                });
-
-                nuevosMensajes.forEach((data, id) => {
-                    if (!messagesDiv.querySelector(`[data-id="${id}"]`)) {
-                        const clase = (data.nombre === miNombre) ? 'mio' : 'otro';
-                        const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${data.nombre}</b>: ${data.mensaje}<div class="hora">${data.hora}</div></div>`;
-                        messagesDiv.insertAdjacentHTML('beforeend', html);
-                    }
-                });
-
-                mensajesActuales = new Map([...mensajesActuales, ...nuevosMensajes]);
-
-                if (!messagesDiv.querySelector('.mensaje') && mensajesActuales.size === 0) {
-                    messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
-                } else {
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
-            } catch (error) {
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }, (error) => {
                 mostrarError("Error al cargar mensajes: " + error.message);
-            }
-        }
-
-        function limpiarChat() {
-            const messagesDiv = document.getElementById('messages');
-            messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
-            mensajesActuales.clear();
-            mostrarDebug("Chat limpiado manualmente");
-        }
-
-        function mostrarDebug(mensaje) {
-            const debugDiv = document.getElementById('debug');
-            debugDiv.innerHTML = mensaje + "<br>" + debugDiv.innerHTML;
+            });
         }
 
         function mostrarError(mensaje) {
