@@ -39,13 +39,13 @@
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map(); // Para rastrear mensajes y evitar parpadeo
+        let mensajesActuales = new Map();
 
         if (miNombre) {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 15000); // Aumentado a 15 segundos
+            setInterval(cargarMensajes, 5000); // Reducido a 5 segundos
         }
 
         function guardarNombre() {
@@ -59,7 +59,7 @@
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 15000); // Aumentado a 15 segundos
+            setInterval(cargarMensajes, 5000); // Reducido a 5 segundos
         }
 
         async function enviar() {
@@ -79,11 +79,22 @@
                     body: formData,
                     mode: 'no-cors'
                 });
+
+                // Mostrar el mensaje localmente de inmediato
+                const timestamp = new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const hora = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                const mensajeId = `${timestamp}:${miNombre}:${msg}`;
+                const messagesDiv = document.getElementById('messages');
+                const html = `<div class="mensaje mio" data-id="${mensajeId}"><b>${miNombre}</b>: ${msg}<div class="hora">${hora}</div></div>`;
+                messagesDiv.insertAdjacentHTML('beforeend', html);
+                mensajesActuales.set(mensajeId, { timestamp, nombre: miNombre, mensaje: msg, hora });
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
                 document.getElementById('mensaje').value = '';
                 const notif = document.getElementById('notificacion');
                 notif.style.display = 'block';
                 setTimeout(() => notif.style.display = 'none', 1000);
-                cargarMensajes(); // Recargar inmediatamente después de enviar
+                setTimeout(cargarMensajes, 1000); // Recargar después de 1 segundo para sincronizar
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -94,19 +105,19 @@
             try {
                 const response = await fetch(`${CSV_URL}&t=${Date.now()}`, {
                     cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' } // Refuerzo anticaché
+                    headers: { 'Cache-Control': 'no-cache' }
                 });
                 const text = await response.text();
+                console.log("CSV recibido:", text); // Debug temporal para ver qué devuelve el CSV
                 const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
                 const messagesDiv = document.getElementById('messages');
                 const nuevosMensajes = new Map();
 
-                // Si no hay filas válidas, mostrar "CHAT FCORP"
+                // Si no hay filas válidas, mantener mensajes locales hasta confirmación
                 if (rows.length === 0 || (rows.length === 1 && rows[0] === '')) {
-                    if (!messagesDiv.querySelector('#chat-vacio')) {
+                    if (mensajesActuales.size === 0 && !messagesDiv.querySelector('.mensaje')) {
                         messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                     }
-                    mensajesActuales.clear();
                     return;
                 }
 
@@ -143,34 +154,34 @@
                     }
                 });
 
-                // Comparar y actualizar solo lo necesario
+                // Actualizar el DOM solo con cambios
                 const mensajesDom = messagesDiv.querySelectorAll('.mensaje');
                 mensajesDom.forEach(msg => {
                     const id = msg.dataset.id;
-                    if (!nuevosMensajes.has(id)) {
-                        msg.remove(); // Eliminar mensajes que ya no están en el CSV
+                    if (!nuevosMensajes.has(id) && !mensajesActuales.has(id)) {
+                        msg.remove(); // Eliminar mensajes que no están en el CSV ni en locales
                     }
                 });
 
                 nuevosMensajes.forEach((data, id) => {
-                    if (!mensajesActuales.has(id)) {
+                    if (!messagesDiv.querySelector(`[data-id="${id}"]`)) {
                         const clase = (data.nombre === miNombre) ? 'mio' : 'otro';
                         const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${data.nombre}</b>: ${data.mensaje}<div class="hora">${data.hora}</div></div>`;
                         messagesDiv.insertAdjacentHTML('beforeend', html);
                     }
                 });
 
-                mensajesActuales = nuevosMensajes;
+                mensajesActuales = new Map([...mensajesActuales, ...nuevosMensajes]);
 
-                // Si no hay mensajes en el DOM, mostrar "CHAT FCORP"
-                if (!messagesDiv.querySelector('.mensaje')) {
+                // Si no hay mensajes en el DOM ni en locales, mostrar "CHAT FCORP"
+                if (!messagesDiv.querySelector('.mensaje') && mensajesActuales.size === 0) {
                     messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                 } else {
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 }
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
-                if (!messagesDiv.querySelector('.mensaje')) {
+                if (!messagesDiv.querySelector('.mensaje') && mensajesActuales.size === 0) {
                     messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                 }
             }
