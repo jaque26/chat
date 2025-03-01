@@ -13,8 +13,6 @@
         .hora { font-size: 0.8em; color: #cccccc; margin-top: 5px; text-align: right; }
         .input-container { position: sticky; bottom: 0; background: #1a1a1a; width: 100%; padding: 10px; box-shadow: 0 -2px 10px rgba(255,255,255,0.1); display: flex; gap: 5px; }
         #nombre-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
-        #cambiar-nombre { display: none; margin-left: 5px; padding: 10px; background: #666666; color: #ffffff; border: none; border-radius: 5px; cursor: pointer; }
-        #cambiar-nombre:hover { background: #8a8a8a; }
         input { flex: 1; padding: 10px; border: 1px solid #333333; border-radius: 5px; background: #333333; color: #ffffff; }
         button { padding: 10px 20px; background: #4a4a4a; color: #ffffff; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background: #666666; }
@@ -31,7 +29,6 @@
     <div class="input-container hidden" id="chat-input">
         <input type="text" id="mensaje" placeholder="Escribe algo...">
         <button onclick="enviar()">Enviar</button>
-        <button id="cambiar-nombre" onclick="cambiarNombre()">Cambiar nombre</button>
     </div>
     <div id="notificacion">✔ Enviado</div>
 
@@ -40,17 +37,16 @@
         const ENTRY_NOMBRE = 'entry.274401486';
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
-        let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map();
-        let ultimoTimestamp = '';
+        let miNombre = localStorage.getItem('miNombre') || ''; // Recordar último nombre
 
-        if (miNombre) {
-            document.getElementById('nombre-container').classList.add('hidden');
-            document.getElementById('chat-input').classList.remove('hidden');
-            document.getElementById('cambiar-nombre').style.display = 'inline-block';
-            cargarMensajes();
-            setInterval(cargarMensajes, 2000); // Actualiza cada 2 segundos
-        }
+        // Mostrar nombre sugerido si existe
+        window.onload = function() {
+            const nombreInput = document.getElementById('nombre-inicial');
+            if (miNombre) {
+                nombreInput.value = miNombre; // Rellenar con el último nombre
+            }
+            nombreInput.focus();
+        };
 
         function guardarNombre() {
             const nombre = document.getElementById('nombre-inicial').value.trim();
@@ -59,24 +55,11 @@
                 return;
             }
             miNombre = nombre;
-            localStorage.setItem('miNombre', miNombre);
+            localStorage.setItem('miNombre', miNombre); // Guardar para próxima vez
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
-            document.getElementById('cambiar-nombre').style.display = 'inline-block';
             cargarMensajes();
             setInterval(cargarMensajes, 2000);
-        }
-
-        function cambiarNombre() {
-            localStorage.removeItem('miNombre');
-            miNombre = '';
-            document.getElementById('chat-input').classList.add('hidden');
-            document.getElementById('cambiar-nombre').style.display = 'none';
-            document.getElementById('nombre-container').classList.remove('hidden');
-            document.getElementById('nombre-inicial').value = '';
-            document.getElementById('nombre-inicial').focus();
-            mensajesActuales.clear(); // Limpiar mensajes actuales
-            document.getElementById('messages').innerHTML = ''; // Limpiar la interfaz
         }
 
         async function enviar() {
@@ -115,7 +98,6 @@
                 const rows = text.split('\n').slice(1);
                 const messagesDiv = document.getElementById('messages');
                 let nuevosMensajes = false;
-                let maxTimestamp = ultimoTimestamp;
 
                 rows.forEach(row => {
                     const columns = [];
@@ -147,13 +129,11 @@
                             const clase = (nombre === miNombre) ? 'mio' : 'otro';
                             const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
                             messagesDiv.insertAdjacentHTML('beforeend', html);
-                            if (timestampRaw > maxTimestamp) maxTimestamp = timestampRaw;
                         }
                     }
                 });
 
                 if (nuevosMensajes) {
-                    ultimoTimestamp = maxTimestamp;
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 }
             } catch (error) {
