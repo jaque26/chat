@@ -5,6 +5,7 @@
     <title>Chat Funcional 100%</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        /* Estilos originales intactos */
         body { margin: 0; font-family: Arial, sans-serif; background: #000000; height: 100vh; display: flex; flex-direction: column; color: #ffffff; }
         #messages { flex: 1; padding: 15px; overflow-y: auto; }
         .mensaje { padding: 10px; margin: 10px 0; border-radius: 8px; max-width: 70%; word-wrap: break-word; position: relative; }
@@ -38,13 +39,17 @@
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Set(); // Modificación 1: Cambiado a Set
+        let ultimoMensajeLeido = 0;
 
         if (miNombre) {
+            iniciarChat();
+        }
+
+        function iniciarChat() {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 3000);
+            setInterval(cargarMensajes, 1000); // Actualización cada 1 segundo
         }
 
         function guardarNombre() {
@@ -55,15 +60,11 @@
             }
             miNombre = nombre;
             localStorage.setItem('miNombre', miNombre);
-            document.getElementById('nombre-container').classList.add('hidden');
-            document.getElementById('chat-input').classList.remove('hidden');
-            cargarMensajes();
-            setInterval(cargarMensajes, 3000);
+            iniciarChat();
         }
 
         async function enviar() {
             const msg = document.getElementById('mensaje').value.trim();
-
             if (!msg) {
                 alert("¡Escribe un mensaje!");
                 return;
@@ -80,81 +81,59 @@
                     mode: 'no-cors'
                 });
                 document.getElementById('mensaje').value = '';
-                const notif = document.getElementById('notificacion');
-                notif.style.display = 'block';
-                setTimeout(() => notif.style.display = 'none', 1000);
-                cargarMensajes();
+                mostrarNotificacion();
+                setTimeout(cargarMensajes, 300);
             } catch (error) {
-                console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
             }
         }
 
+        function mostrarNotificacion() {
+            const notif = document.getElementById('notificacion');
+            notif.style.display = 'block';
+            setTimeout(() => notif.style.display = 'none', 1000);
+        }
+
         async function cargarMensajes() {
             try {
-                const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
+                const response = await fetch(`${CSV_URL}&rand=${Math.random()}`); // Evitar caché
                 const text = await response.text();
-                const rows = text.split('\n').slice(1);
-                const messagesDiv = document.getElementById('messages');
-                const nuevosIDs = new Set(); // Modificación 2: Trackear nuevos IDs
-
-                // Limpiar mensajes si no hay datos
-                if (rows.length === 0) {
-                    messagesDiv.innerHTML = '';
-                    mensajesActuales.clear();
+                
+                // Limpiar todo si el sheet está vacío
+                if (text.trim() === 'Timestamp,Usuario,Mensaje') {
+                    document.getElementById('messages').innerHTML = '';
+                    ultimoMensajeLeido = 0;
                     return;
                 }
 
+                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
+                
+                // Detectar cambios reales
+                if (rows.length === ultimoMensajeLeido) return;
+                ultimoMensajeLeido = rows.length;
+
+                // Limpiar y reconstruir todo
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+
                 rows.forEach(row => {
-                    const columns = [];
-                    let current = '';
-                    let inQuotes = false;
-                    for (let char of row) {
-                        if (char === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (char === ',' && !inQuotes) {
-                            columns.push(current.trim());
-                            current = '';
-                        } else {
-                            current += char;
-                        }
-                    }
-                    columns.push(current.trim());
+                    const columns = row.split(',').map(col => col.replace(/^"|"$/g, '').trim());
                     if (columns.length >= 3) {
-                        const timestampRaw = columns[0].replace(/^"|"$/g, '');
-                        const nombre = columns[1].replace(/^"|"$/g, '');
-                        let mensaje = columns[2].replace(/^"|"$/g, '');
-                        mensaje = mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
-                        nuevosIDs.add(mensajeId);
-
-                        if (!mensajesActuales.has(mensajeId)) {
-                            mensajesActuales.add(mensajeId);
-                            const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
-                            const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
-                            const clase = (nombre === miNombre) ? 'mio' : 'otro';
-                            const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
-                            messagesDiv.insertAdjacentHTML('beforeend', html);
-                        }
-                    }
-                });
-
-                // Modificación 3: Eliminar mensajes antiguos
-                mensajesActuales.forEach(id => {
-                    if (!nuevosIDs.has(id)) {
-                        const elementos = document.querySelectorAll(`.mensaje`);
-                        elementos.forEach(elemento => {
-                            if (elemento.innerHTML.includes(id.split(':')[2])) {
-                                elemento.remove();
-                            }
-                        });
-                        mensajesActuales.delete(id);
+                        const [timestamp, nombre, mensaje] = columns;
+                        const hora = new Date(timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
+                        const clase = nombre === miNombre ? 'mio' : 'otro';
+                        messagesDiv.innerHTML += `
+                            <div class="mensaje ${clase}">
+                                <b>${nombre}</b>: ${mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                                <div class="hora">${hora}</div>
+                            </div>
+                        `;
                     }
                 });
 
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             } catch (error) {
-                console.error("Error al cargar mensajes:", error);
+                console.error("Error:", error);
             }
         }
     </script>
