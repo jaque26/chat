@@ -44,7 +44,7 @@
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 5000);
+            setInterval(cargarMensajes, 10000); // Cambiado a 10 segundos
         }
 
         function guardarNombre() {
@@ -58,7 +58,7 @@
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 5000);
+            setInterval(cargarMensajes, 10000); // Cambiado a 10 segundos
         }
 
         async function enviar() {
@@ -99,8 +99,8 @@
                 // Limpiar completamente el contenedor de mensajes
                 messagesDiv.innerHTML = '';
 
-                // Si no hay mensajes, mostrar "CHAT FCORP"
-                if (rows.length === 0) {
+                // Si no hay filas válidas, mostrar "CHAT FCORP" y salir
+                if (rows.length === 0 || (rows.length === 1 && rows[0] === '')) {
                     messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                     return;
                 }
@@ -110,6 +110,8 @@
                     const columns = [];
                     let current = '';
                     let inQuotes = false;
+
+                    // Parsing robusto para manejar comas y comillas
                     for (let char of row) {
                         if (char === '"') {
                             inQuotes = !inQuotes;
@@ -122,24 +124,33 @@
                     }
                     columns.push(current.trim());
 
-                    if (columns.length >= 3) {
+                    // Verificar que la fila tenga al menos 3 columnas válidas y no estén vacías
+                    if (columns.length >= 3 && columns[0] && columns[1] && columns[2]) {
                         const timestampRaw = columns[0].replace(/^"|"$/g, '');
                         const nombre = columns[1].replace(/^"|"$/g, '');
                         let mensaje = columns[2].replace(/^"|"$/g, '');
                         mensaje = mensaje.replace(/</g, '<').replace(/>/g, '>');
 
+                        // Validar que el timestamp sea válido
                         const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
-                        const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
+                        if (!parts) return; // Saltar si el timestamp no es válido
+
+                        const hora = new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
                         const clase = (nombre === miNombre) ? 'mio' : 'otro';
                         const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
                         messagesDiv.insertAdjacentHTML('beforeend', html);
                     }
                 });
 
-                // Desplazar al final solo si hay mensajes
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                // Si no se agregó ningún mensaje válido, mostrar "CHAT FCORP"
+                if (!messagesDiv.querySelector('.mensaje')) {
+                    messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
+                } else {
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Desplazar al final
+                }
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
+                messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>'; // Mostrar algo en caso de error
             }
         }
     </script>
