@@ -18,6 +18,7 @@
         button:hover { background: #666666; }
         .hidden { display: none; }
         #notificacion { position: fixed; bottom: 60px; right: 20px; background: #075e54; padding: 10px; border-radius: 5px; color: #ffffff; font-size: 0.9em; display: none; }
+        #chat-vacio { text-align: center; padding: 20px; font-size: 1.2em; color: #cccccc; }
     </style>
 </head>
 <body>
@@ -82,7 +83,7 @@
                 document.getElementById('mensaje').value = '';
                 const notif = document.getElementById('notificacion');
                 notif.style.display = 'block';
-                setTimeout(() => notif.style.display = 'none', 1000); // 1 segundo
+                setTimeout(() => notif.style.display = 'none', 1000);
                 cargarMensajes();
             } catch (error) {
                 console.error("Error al enviar:", error);
@@ -92,11 +93,19 @@
 
         async function cargarMensajes() {
             try {
-                const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
+                const response = await fetch(`${CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
                 const text = await response.text();
-                const rows = text.split('\n').slice(1);
+                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
                 const messagesDiv = document.getElementById('messages');
-                let nuevosMensajes = false;
+
+                // Limpiar mensajes anteriores
+                messagesDiv.innerHTML = '';
+                mensajesActuales.clear();
+
+                if (rows.length === 0) {
+                    messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
+                    return;
+                }
 
                 rows.forEach(row => {
                     const columns = [];
@@ -116,26 +125,28 @@
                     if (columns.length >= 3) {
                         const timestampRaw = columns[0].replace(/^"|"$/g, '');
                         const nombre = columns[1].replace(/^"|"$/g, '');
-                        // Escapar HTML para evitar ejecución
                         let mensaje = columns[2].replace(/^"|"$/g, '');
-                        mensaje = mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
+                        mensaje = mensaje.replace(/</g, '<').replace(/>/g, '>');
 
-                        if (!mensajesActuales.has(mensajeId)) {
-                            mensajesActuales.set(mensajeId, { timestamp: timestampRaw, nombre, mensaje });
-                            nuevosMensajes = true;
-                            const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
-                            const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
-                            const clase = (nombre === miNombre) ? 'mio' : 'otro';
-                            const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
-                            messagesDiv.insertAdjacentHTML('beforeend', html);
+                        // Soporte para "clear"
+                        if (mensaje === 'clear' && nombre === miNombre) {
+                            messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
+                            mensajesActuales.clear();
+                            return;
                         }
+
+                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
+                        mensajesActuales.set(mensajeId, { timestamp: timestampRaw, nombre, mensaje });
+
+                        const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
+                        const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
+                        const clase = (nombre === miNombre) ? 'mio' : 'otro';
+                        const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
+                        messagesDiv.insertAdjacentHTML('beforeend', html);
                     }
                 });
 
-                if (nuevosMensajes) {
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
             }
