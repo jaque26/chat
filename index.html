@@ -32,6 +32,7 @@
         <input type="text" id="mensaje" placeholder="Escribe algo...">
         <button onclick="enviar()">Enviar</button>
         <button onclick="cargarMensajes()">Recargar</button>
+        <button onclick="limpiarChat()">Limpiar</button>
     </div>
     <div id="notificacion">✔ Enviado</div>
     <div id="debug"></div>
@@ -110,11 +111,12 @@
                     headers: { 'Cache-Control': 'no-cache' }
                 });
                 const text = await response.text();
-                mostrarDebug("CSV recibido: " + text.substring(0, 100) + (text.length > 100 ? "..." : "")); // Mostrar первые 100 символов
+                mostrarDebug("CSV recibido: " + text.substring(0, 100) + (text.length > 100 ? "..." : ""));
                 const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
                 const nuevosMensajes = new Map();
 
-                if (rows.length === 0 || (rows.length === 1 && rows[0] === '')) {
+                // Si el CSV está vacío o solo tiene encabezados, no limpiar mensajes locales inmediatamente
+                if (rows.length === 0 || (rows.length === 1 && rows[0].startsWith('Marca temporal'))) {
                     if (mensajesActuales.size === 0 && !messagesDiv.querySelector('.mensaje')) {
                         messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                     }
@@ -181,9 +183,16 @@
             }
         }
 
+        function limpiarChat() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
+            mensajesActuales.clear();
+            mostrarDebug("Chat limpiado manualmente");
+        }
+
         function mostrarDebug(mensaje) {
             const debugDiv = document.getElementById('debug');
-            debugDiv.innerHTML = mensaje + "<br>" + debugDiv.innerHTML; // Añadir al inicio
+            debugDiv.innerHTML = mensaje + "<br>" + debugDiv.innerHTML;
         }
 
         function mostrarError(mensaje) {
