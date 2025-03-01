@@ -39,7 +39,6 @@
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map();
 
         if (miNombre) {
             document.getElementById('nombre-container').classList.add('hidden');
@@ -64,7 +63,6 @@
 
         async function enviar() {
             const msg = document.getElementById('mensaje').value.trim();
-
             if (!msg) {
                 alert("¡Escribe un mensaje!");
                 return;
@@ -84,7 +82,7 @@
                 const notif = document.getElementById('notificacion');
                 notif.style.display = 'block';
                 setTimeout(() => notif.style.display = 'none', 1000);
-                cargarMensajes();
+                cargarMensajes(); // Recargar inmediatamente después de enviar
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
@@ -95,18 +93,19 @@
             try {
                 const response = await fetch(`${CSV_URL}&t=${Date.now()}`, { cache: 'no-store' });
                 const text = await response.text();
-                const rows = text.split('\n').slice(1).filter(row => row.trim() !== '');
+                const rows = text.split('\n').slice(1).filter(row => row.trim() !== ''); // Filtra filas vacías
                 const messagesDiv = document.getElementById('messages');
 
-                // Limpiar mensajes anteriores
+                // Limpiar completamente el contenedor de mensajes
                 messagesDiv.innerHTML = '';
-                mensajesActuales.clear();
 
+                // Si no hay mensajes, mostrar "CHAT FCORP"
                 if (rows.length === 0) {
                     messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
                     return;
                 }
 
+                // Procesar cada fila del CSV
                 rows.forEach(row => {
                     const columns = [];
                     let current = '';
@@ -122,21 +121,12 @@
                         }
                     }
                     columns.push(current.trim());
+
                     if (columns.length >= 3) {
                         const timestampRaw = columns[0].replace(/^"|"$/g, '');
                         const nombre = columns[1].replace(/^"|"$/g, '');
                         let mensaje = columns[2].replace(/^"|"$/g, '');
                         mensaje = mensaje.replace(/</g, '<').replace(/>/g, '>');
-
-                        // Soporte para "clear"
-                        if (mensaje === 'clear' && nombre === miNombre) {
-                            messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
-                            mensajesActuales.clear();
-                            return;
-                        }
-
-                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
-                        mensajesActuales.set(mensajeId, { timestamp: timestampRaw, nombre, mensaje });
 
                         const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
                         const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
@@ -146,6 +136,7 @@
                     }
                 });
 
+                // Desplazar al final solo si hay mensajes
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
