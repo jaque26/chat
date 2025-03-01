@@ -37,16 +37,15 @@
         const ENTRY_NOMBRE = 'entry.274401486';
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
-        let miNombre = localStorage.getItem('miNombre') || ''; // Recordar último nombre
+        let miNombre = localStorage.getItem('miNombre') || '';
+        let mensajesActuales = new Map();
 
-        // Mostrar nombre sugerido si existe
-        window.onload = function() {
-            const nombreInput = document.getElementById('nombre-inicial');
-            if (miNombre) {
-                nombreInput.value = miNombre; // Rellenar con el último nombre
-            }
-            nombreInput.focus();
-        };
+        if (miNombre) {
+            document.getElementById('nombre-container').classList.add('hidden');
+            document.getElementById('chat-input').classList.remove('hidden');
+            cargarMensajes();
+            setInterval(cargarMensajes, 2000); // Actualiza cada 2 segundos
+        }
 
         function guardarNombre() {
             const nombre = document.getElementById('nombre-inicial').value.trim();
@@ -55,7 +54,7 @@
                 return;
             }
             miNombre = nombre;
-            localStorage.setItem('miNombre', miNombre); // Guardar para próxima vez
+            localStorage.setItem('miNombre', miNombre);
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
@@ -98,6 +97,7 @@
                 const rows = text.split('\n').slice(1);
                 const messagesDiv = document.getElementById('messages');
                 let nuevosMensajes = false;
+                let mensajesActuales = new Map(); // Reiniciar en cada ciclo
 
                 rows.forEach(row => {
                     const columns = [];
