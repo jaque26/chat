@@ -38,17 +38,13 @@
         const ENTRY_MSG = 'entry.283835787';
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPg8I5ZCYxQMvs0eNOoW7WT_yR_kmQaNYOvkbMBp3gc2BqQpKGDw9TMaEbqTfh-zsH4nuy8LH1WImS/pub?output=csv';
         let miNombre = localStorage.getItem('miNombre') || '';
-        let mensajesActuales = new Map();
+        let mensajesActuales = new Set(); // Modificación 1: Cambiado a Set
 
         if (miNombre) {
-            iniciarChat();
-        }
-
-        function iniciarChat() {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
-            setInterval(cargarMensajes, 2000); // Actualización cada 2 segundos
+            setInterval(cargarMensajes, 3000);
         }
 
         function guardarNombre() {
@@ -59,11 +55,15 @@
             }
             miNombre = nombre;
             localStorage.setItem('miNombre', miNombre);
-            iniciarChat();
+            document.getElementById('nombre-container').classList.add('hidden');
+            document.getElementById('chat-input').classList.remove('hidden');
+            cargarMensajes();
+            setInterval(cargarMensajes, 3000);
         }
 
         async function enviar() {
             const msg = document.getElementById('mensaje').value.trim();
+
             if (!msg) {
                 alert("¡Escribe un mensaje!");
                 return;
@@ -80,18 +80,14 @@
                     mode: 'no-cors'
                 });
                 document.getElementById('mensaje').value = '';
-                mostrarNotificacion();
-                setTimeout(cargarMensajes, 500); // Actualización rápida después de enviar
+                const notif = document.getElementById('notificacion');
+                notif.style.display = 'block';
+                setTimeout(() => notif.style.display = 'none', 1000);
+                cargarMensajes();
             } catch (error) {
                 console.error("Error al enviar:", error);
                 alert("Error al enviar ❌");
             }
-        }
-
-        function mostrarNotificacion() {
-            const notif = document.getElementById('notificacion');
-            notif.style.display = 'block';
-            setTimeout(() => notif.style.display = 'none', 1000);
         }
 
         async function cargarMensajes() {
@@ -100,82 +96,66 @@
                 const text = await response.text();
                 const rows = text.split('\n').slice(1);
                 const messagesDiv = document.getElementById('messages');
-                const nuevosIds = new Set();
-                const fragment = document.createDocumentFragment();
+                const nuevosIDs = new Set(); // Modificación 2: Trackear nuevos IDs
 
-                // Procesar nuevas filas
+                // Limpiar mensajes si no hay datos
+                if (rows.length === 0) {
+                    messagesDiv.innerHTML = '';
+                    mensajesActuales.clear();
+                    return;
+                }
+
                 rows.forEach(row => {
-                    const columns = parseCSVRow(row);
+                    const columns = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let char of row) {
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            columns.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    columns.push(current.trim());
                     if (columns.length >= 3) {
-                        const [timestampRaw, nombre, mensaje] = columns;
-                        const mensajeId = generarIdUnico(timestampRaw, nombre, mensaje);
-                        nuevosIds.add(mensajeId);
+                        const timestampRaw = columns[0].replace(/^"|"$/g, '');
+                        const nombre = columns[1].replace(/^"|"$/g, '');
+                        let mensaje = columns[2].replace(/^"|"$/g, '');
+                        mensaje = mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const mensajeId = `${timestampRaw}:${nombre}:${mensaje}`;
+                        nuevosIDs.add(mensajeId);
 
                         if (!mensajesActuales.has(mensajeId)) {
-                            const elemento = crearElementoMensaje(timestampRaw, nombre, mensaje, mensajeId);
-                            fragment.appendChild(elemento);
-                            mensajesActuales.set(mensajeId, elemento);
+                            mensajesActuales.add(mensajeId);
+                            const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
+                            const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '??:??';
+                            const clase = (nombre === miNombre) ? 'mio' : 'otro';
+                            const html = `<div class="mensaje ${clase}"><b>${nombre}</b>: ${mensaje}<div class="hora">${hora}</div></div>`;
+                            messagesDiv.insertAdjacentHTML('beforeend', html);
                         }
                     }
                 });
 
-                // Eliminar mensajes borrados
-                mensajesActuales.forEach((elemento, id) => {
-                    if (!nuevosIds.has(id)) {
-                        elemento.remove();
+                // Modificación 3: Eliminar mensajes antiguos
+                mensajesActuales.forEach(id => {
+                    if (!nuevosIDs.has(id)) {
+                        const elementos = document.querySelectorAll(`.mensaje`);
+                        elementos.forEach(elemento => {
+                            if (elemento.innerHTML.includes(id.split(':')[2])) {
+                                elemento.remove();
+                            }
+                        });
                         mensajesActuales.delete(id);
                     }
                 });
 
-                // Añadir nuevos mensajes
-                if (fragment.children.length > 0) {
-                    messagesDiv.appendChild(fragment);
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
             } catch (error) {
                 console.error("Error al cargar mensajes:", error);
             }
-        }
-
-        function parseCSVRow(row) {
-            const columns = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let char of row) {
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    columns.push(current.trim().replace(/^"|"$/g, ''));
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            columns.push(current.trim().replace(/^"|"$/g, ''));
-            return columns;
-        }
-
-        function generarIdUnico(timestamp, nombre, mensaje) {
-            return `${timestamp}:${nombre}:${mensaje}`.replace(/[^a-zA-Z0-9:/]/g, '');
-        }
-
-        function crearElementoMensaje(timestampRaw, nombre, mensaje, mensajeId) {
-            const parts = timestampRaw.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)/);
-            const hora = parts ? new Date(`${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6]}`).toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit'
-            }) : '??:??';
-
-            const clase = nombre === miNombre ? 'mio' : 'otro';
-            const elemento = document.createElement('div');
-            elemento.className = `mensaje ${clase}`;
-            elemento.dataset.id = mensajeId;
-            elemento.innerHTML = `
-                <b>${nombre}</b>: ${mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-                <div class="hora">${hora}</div>
-            `;
-            return elemento;
         }
     </script>
 </body>
