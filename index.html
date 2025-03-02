@@ -21,6 +21,7 @@
         .hidden { display: none; }
         #notificacion { position: fixed; bottom: 60px; right: 20px; background: #075e54; padding: 10px; border-radius: 5px; color: #ffffff; font-size: 0.9em; display: none; }
         #chat-vacio { text-align: center; padding: 20px; font-size: 1.2em; color: #cccccc; }
+        #status { position: fixed; top: 10px; left: 10px; background: #333; padding: 5px; border-radius: 5px; font-size: 0.8em; color: #ff4444; max-width: 90%; overflow-x: auto; }
     </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
         <button onclick="enviar()">Enviar</button>
     </div>
     <div id="notificacion">✔ Enviado</div>
+    <div id="status"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
@@ -64,6 +66,7 @@
             cargarMensajes();
             actualizarEstadoEnLinea(true);
             verificarMensajesVistos();
+            mostrarEstado("Lista y cargando mensajes...");
         }
 
         window.guardarNombre = function() {
@@ -79,6 +82,7 @@
             cargarMensajes();
             actualizarEstadoEnLinea(true);
             verificarMensajesVistos();
+            mostrarEstado("Usuario " + miNombre + " conectado.");
         };
 
         window.enviar = function() {
@@ -104,9 +108,10 @@
                     const notif = document.getElementById('notificacion');
                     notif.style.display = 'block';
                     setTimeout(() => notif.style.display = 'none', 1000);
+                    mostrarEstado("Mensaje enviado exitosamente.");
                 })
                 .catch(error => {
-                    alert("Error al enviar: " + error.message); // Mostrar error si falla
+                    mostrarEstado("Error al enviar: " + error.message);
                 });
         };
 
@@ -124,7 +129,8 @@
                 Object.entries(data).forEach(([id, mensaje]) => {
                     const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
                     let estadoLinea = '';
-                    onValue(ref(db, `usuarios/${mensaje.nombre}`), (snap) => {
+                    const usuarioRef = ref(db, `usuarios/${mensaje.nombre}`);
+                    onValue(usuarioRef, (snap) => {
                         const usuario = snap.val();
                         if (usuario && usuario.ultimaActividad) {
                             estadoLinea = ` (${getRelativeTime(usuario.ultimaActividad)})`;
@@ -145,7 +151,7 @@
                     marcarMensajesComoVistos();
                 }
             }, (error) => {
-                alert("Error al cargar mensajes: " + error.message);
+                mostrarEstado("Error al cargar mensajes: " + error.message);
             });
         }
 
@@ -207,6 +213,11 @@
 
         // Actualizar estado cada 30 segundos mientras está activo
         setInterval(() => actualizarEstadoEnLinea(true), 30000);
+
+        function mostrarEstado(mensaje) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = mensaje; // Mostrar estado actual
+        }
     </script>
 </body>
 </html>
