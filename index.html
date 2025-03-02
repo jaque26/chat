@@ -12,6 +12,7 @@
         .mensaje.mio { background: #075e54; float: right; clear: both; }
         .mensaje.otro { background: #262d31; float: left; clear: both; }
         .hora { font-size: 0.8em; color: #cccccc; margin-top: 5px; text-align: right; }
+        .estado { font-size: 0.7em; color: #999; margin-top: 2px; text-align: right; }
         .input-container { position: sticky; bottom: 0; background: #1a1a1a; width: 100%; padding: 10px; box-shadow: 0 -2px 10px rgba(255,255,255,0.1); display: flex; gap: 5px; }
         #nombre-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
         input { flex: 1; padding: 10px; border: 1px solid #333333; border-radius: 5px; background: #333333; color: #ffffff; }
@@ -55,23 +56,23 @@
         const db = getDatabase(app);
         const mensajesRef = ref(db, 'mensajes');
 
-        let miNombre = localStorage.getItem('miNombre') || '';
+        let miNombre = localStorage.getItem('miNome') || '';
 
         if (miNombre) {
-            document.getElementById('nombre-container').classList.add('hidden');
+            document.getElementById('nome-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
         }
 
-        window.guardarNombre = function() {
-            const nombre = document.getElementById('nombre-inicial').value.trim();
-            if (!nombre) {
-                alert("¡Escribe tu nombre!");
+        window.guardarNome = function() {
+            const nome = document.getElementById('nome-inicial').value.trim();
+            if (!nome) {
+                alert("¡Escribe tu nome!");
                 return;
             }
-            miNombre = nombre;
-            localStorage.setItem('miNombre', miNombre);
-            document.getElementById('nombre-container').classList.add('hidden');
+            miNome = nome;
+            localStorage.setItem('miNome', miNome);
+            document.getElementById('nome-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
         };
@@ -84,47 +85,71 @@
             }
 
             const timestamp = new Date().toISOString();
-            const sanitizedMsg = msg.replace(/</g, '<').replace(/>/g, '>'); // Escapar HTML/JS
+            const sanitizedMsg = new DOMParser().parseFromString(msg, 'text/html').body.textContent; // Escapar HTML/JS de forma segura
             const mensaje = {
-                nombre: miNombre,
-                mensaje: sanitizedMsg,
+                nome: miNome,
+                mensagem: sanitizedMsg,
                 timestamp: timestamp,
-                hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                ultimaActividad: new Date().toISOString(), // Para "en línea" simple
+                visto: miNome === 'todos' ? true : false // Marcar como visto al enviar
             };
 
-            push(mensajesRef, mensaje)
+            push(mensajesRef, mensagem)
                 .then(() => {
-                    document.getElementById('mensaje').value = '';
-                    const notif = document.getElementById('notificacion');
+                    document.getElementById('mensagem').value = '';
+                    const notif = document.getElementById('notificação');
                     notif.style.display = 'block';
                     setTimeout(() => notif.style.display = 'none', 1000);
                 })
                 .catch(error => {
-                    alert("Error al enviar: " + error.message); // Mostrar error como alerta
+                    alert("Error al enviar: " + error.message);
                 });
         };
 
         function cargarMensajes() {
             onValue(mensajesRef, (snapshot) => {
-                const messagesDiv = document.getElementById('messages');
+                const messagesDiv = document.getElementById('mensagens');
                 messagesDiv.innerHTML = '';
 
                 const data = snapshot.val();
                 if (!data) {
-                    messagesDiv.innerHTML = '<div id="chat-vacio">CHAT FCORP</div>';
+                    messagesDiv.innerHTML = '<div id="chat-vazio">CHAT FCORP</div>';
                     return;
                 }
 
-                Object.entries(data).forEach(([id, mensaje]) => {
-                    const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
-                    const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${mensaje.nombre}</b>: ${mensaje.mensaje}<div class="hora">${mensaje.hora}</div></div>`;
+                Object.entries(data).forEach(([id, mensagem]) => {
+                    const classe = (mensagem.nome === miNome) ? 'mio' : 'outro';
+                    let estado = '';
+                    if (mensagem.ultimaActividad && mensagem.nome !== miNome) {
+                        estado = ` (${getRelativeTime(mensagem.ultimaActividad)})`;
+                    }
+                    const html = `
+                        <div class="mensagem ${classe}" data-id="${id}">
+                            <b>${mensagem.nome}${estado}</b>: ${mensagem.mensagem}
+                            <div class="hora">${mensagem.hora}</div>
+                            ${mensagem.visto && mensagem.nome !== miNome ? '<div class="estado">Visto</div>' : ''}
+                        </div>
+                    `;
                     messagesDiv.insertAdjacentHTML('beforeend', html);
                 });
 
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }, (error) => {
-                alert("Error al cargar mensajes: " + error.message); // Mostrar error como alerta
+                alert("Error al cargar mensajes: " + error.message);
             });
+        }
+
+        function getRelativeTime(timestamp) {
+            const agora = new Date();
+            const tempo = new Date(timestamp);
+            const diffMs = agora - tempo;
+            const diffMin = Math.floor(diffMs / 60000); // Minutos
+
+            if (diffMin < 1) return "agora";
+            if (diffMin < 60) return `hace ${diffMin} minuto${diffMin > 1 ? 's' : ''}`;
+            const diffHoras = Math.floor(diffMin / 60);
+            return `hace ${diffHoras} hora${diffHoras > 1 ? 's' : ''} a las ${tempo.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
         }
     </script>
 </body>
