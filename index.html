@@ -117,7 +117,8 @@
 
                 Object.entries(data).forEach(([id, mensaje]) => {
                     const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
-                    const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${mensaje.nombre}</b>: ${mensaje.mensaje}<div class="hora">${mensaje.hora}</div></div>`;
+                    const safeMessage = new DOMParser().parseFromString(mensaje.mensaje, 'text/html').body.textContent; // Escapar al cargar
+                    const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${mensaje.nombre}</b>: ${safeMessage}<div class="hora">${mensaje.hora}</div></div>`;
                     messagesDiv.insertAdjacentHTML('beforeend', html);
                 });
 
