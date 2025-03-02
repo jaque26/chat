@@ -39,6 +39,7 @@
     <div id="status"></div>
 
     <script type="module">
+        // Inicializar Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
         import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
 
@@ -53,20 +54,26 @@
             measurementId: "G-W15GX5VNZ1"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const mensajesRef = ref(db, 'mensajes');
-        const usuariosRef = ref(db, 'usuarios');
+        let app, db, mensajesRef, usuariosRef;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            mensajesRef = ref(db, 'mensajes');
+            usuariosRef = ref(db, 'usuarios');
+            mostrarEstado("Firebase inicializado correctamente.");
+        } catch (error) {
+            mostrarEstado("Error al inicializar Firebase: " + error.message);
+        }
 
         let miNombre = localStorage.getItem('miNombre') || '';
 
-        if (miNombre) {
+        if (miNombre && app) {
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
             cargarMensajes();
             actualizarEstadoEnLinea(true);
             verificarMensajesVistos();
-            mostrarEstado("Lista y cargando mensajes...");
+            mostrarEstado("Usuario " + miNombre + " listo para chatear.");
         }
 
         window.guardarNombre = function() {
@@ -79,13 +86,21 @@
             localStorage.setItem('miNombre', miNombre);
             document.getElementById('nombre-container').classList.add('hidden');
             document.getElementById('chat-input').classList.remove('hidden');
-            cargarMensajes();
-            actualizarEstadoEnLinea(true);
-            verificarMensajesVistos();
-            mostrarEstado("Usuario " + miNombre + " conectado.");
+            if (app) {
+                cargarMensajes();
+                actualizarEstadoEnLinea(true);
+                verificarMensajesVistos();
+                mostrarEstado("Usuario " + miNombre + " conectado.");
+            } else {
+                mostrarEstado("Error: Firebase no inicializado.");
+            }
         };
 
         window.enviar = function() {
+            if (!app) {
+                mostrarEstado("Error: Firebase no inicializado.");
+                return;
+            }
             const msg = document.getElementById('mensaje').value.trim();
             if (!msg) {
                 alert("¡Escribe un mensaje!");
@@ -116,6 +131,10 @@
         };
 
         function cargarMensajes() {
+            if (!app) {
+                mostrarEstado("Error: Firebase no inicializado para cargar mensajes.");
+                return;
+            }
             onValue(mensajesRef, (snapshot) => {
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.innerHTML = '';
@@ -130,12 +149,12 @@
                     const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
                     let estadoLinea = '';
                     const usuarioRef = ref(db, `usuarios/${mensaje.nombre}`);
-                    onValue(usuarioRef, (snap) => {
+                    usuarioRef.once('value', (snap) => {
                         const usuario = snap.val();
                         if (usuario && usuario.ultimaActividad) {
                             estadoLinea = ` (${getRelativeTime(usuario.ultimaActividad)})`;
                         }
-                    }, { onlyOnce: true });
+                    });
                     const html = `
                         <div class="mensaje ${clase}" data-id="${id}">
                             <b>${mensaje.nombre}${estadoLinea}</b>: ${mensaje.mensaje}
@@ -156,6 +175,7 @@
         }
 
         function actualizarEstadoEnLinea(estado) {
+            if (!app) return;
             const usuarioRef = ref(db, `usuarios/${miNombre}`);
             update(usuarioRef, {
                 enLinea: estado,
@@ -167,6 +187,7 @@
         }
 
         function verificarMensajesVistos() {
+            if (!app) return;
             mensajesRef.on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -181,6 +202,7 @@
         }
 
         function marcarMensajesComoVistos() {
+            if (!app) return;
             mensajesRef.once('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
