@@ -100,7 +100,7 @@
                     setTimeout(() => notif.style.display = 'none', 1000);
                 })
                 .catch(error => {
-                    alert("Error al enviar: " + error.message);
+                    alert("Error al enviar: " + error.message); // Mostrar error como alerta
                 });
         };
 
@@ -117,18 +117,13 @@
 
                 Object.entries(data).forEach(([id, mensaje]) => {
                     const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
-                    const html = `
-                        <div class="mensaje ${clase}" data-id="${id}">
-                            <b>${mensaje.nombre}</b>: ${mensagem.mensagem}
-                            <div class="hora">${mensagem.hora}</div>
-                        </div>
-                    `;
+                    const html = `<div class="mensaje ${clase}" data-id="${id}"><b>${mensaje.nombre}</b>: ${mensaje.mensaje}<div class="hora">${mensaje.hora}</div></div>`;
                     messagesDiv.insertAdjacentHTML('beforeend', html);
                 });
 
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }, (error) => {
-                alert("Error al cargar mensajes: " + error.message);
+                alert("Error al cargar mensajes: " + error.message); // Mostrar error como alerta
             });
         }
     </script>
