@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #000000; height: 100vh; display: flex; flex-direction: column; color: #ffffff; }
-        #chat-title { padding: 10px; background: #075e54; text-align: center; font-size: 1.5em; font-weight: bold; }
+        #chat-title { padding: 10px; text-align: center; font-size: 1.2em; } /* Sin fondo ni negrita */
         #messages { flex: 1; padding: 15px; overflow-y: auto; }
         .mensaje { padding: 10px; margin: 10px 0; border-radius: 8px; max-width: 70%; word-wrap: break-word; position: relative; }
         .mensaje.mio { background: #075e54; float: right; clear: both; }
@@ -89,13 +89,13 @@
             }
 
             const timestamp = new Date().toISOString();
-            const sanitizedMsg = msg.replace(/</g, '&lt;').replace(/>/g, '&gt;'); // Escapar HTML/JS
+            const sanitizedMsg = msg.replace(/</g, '<').replace(/>/g, '>'); // Escapar HTML/JS
             const mensaje = {
                 nombre: miNombre,
                 mensaje: sanitizedMsg,
                 timestamp: timestamp,
                 hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-                visto: false // Inicialmente no visto
+                visto: false
             };
 
             push(mensajesRef, mensaje)
@@ -106,7 +106,7 @@
                     setTimeout(() => notif.style.display = 'none', 1000);
                 })
                 .catch(error => {
-                    alert("Error al enviar: " + error.message);
+                    alert("Error al enviar: " + error.message); // Mostrar error si falla
                 });
         };
 
@@ -123,9 +123,16 @@
 
                 Object.entries(data).forEach(([id, mensaje]) => {
                     const clase = (mensaje.nombre === miNombre) ? 'mio' : 'otro';
+                    let estadoLinea = '';
+                    onValue(ref(db, `usuarios/${mensaje.nombre}`), (snap) => {
+                        const usuario = snap.val();
+                        if (usuario && usuario.ultimaActividad) {
+                            estadoLinea = ` (${getRelativeTime(usuario.ultimaActividad)})`;
+                        }
+                    }, { onlyOnce: true });
                     const html = `
                         <div class="mensaje ${clase}" data-id="${id}">
-                            <b>${mensaje.nombre}</b>: ${mensaje.mensaje}
+                            <b>${mensaje.nombre}${estadoLinea}</b>: ${mensaje.mensaje}
                             <div class="hora">${mensaje.hora}</div>
                             ${mensaje.visto && mensaje.nombre !== miNombre ? `<div class="estado">Visto: ${getRelativeTime(mensaje.visto)}</div>` : ''}
                         </div>
