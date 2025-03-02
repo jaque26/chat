@@ -73,7 +73,7 @@
             cargarMensajes();
             actualizarEstadoEnLinea(true);
             verificarMensajesVistos();
-            mostrarEstado("Usuario " + miNombre + " listo para chatear.");
+            mostrarEstado("Usuario " + miNombre + " listo.");
         }
 
         window.guardarNombre = function() {
@@ -123,7 +123,7 @@
                     const notif = document.getElementById('notificacion');
                     notif.style.display = 'block';
                     setTimeout(() => notif.style.display = 'none', 1000);
-                    mostrarEstado("Mensaje enviado exitosamente.");
+                    mostrarEstado("Mensaje enviado.");
                 })
                 .catch(error => {
                     mostrarEstado("Error al enviar: " + error.message);
